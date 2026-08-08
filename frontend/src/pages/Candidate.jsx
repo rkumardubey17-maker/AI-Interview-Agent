@@ -38,7 +38,9 @@ export default function CandidateSelection() {
    );
 
    const handleSelectCandidate = (candidate) => {
-      navigate('/interview/', { state: { candidate } });
+      navigate(`/interview/${candidate.id}`, {
+         state: { candidate },
+      });
    };
 
    return (
@@ -56,7 +58,7 @@ export default function CandidateSelection() {
             {/* Navigation & Theme Toggle */}
             <header className="mb-8 flex justify-between items-center">
                <div
-                  onClick={() => navigate('/')}
+                   onClick={() => handleSelectCandidate(candidate)}
                   className="flex items-center space-x-2.5 cursor-pointer group"
                >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10 border border-blue-500/30 dark:bg-cyan-500/10 dark:border-cyan-500/30 transition-transform group-hover:scale-105">
