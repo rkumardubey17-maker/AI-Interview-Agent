@@ -267,10 +267,7 @@ const interview = asyncHandler(async (req, res) => {
     // 8. CHECK IF INTERVIEW IS COMPLETE
     // ==========================================
 
-    if (
-        session.questionsAsked >= 8 &&
-        session.daysCovered.length >= 4
-    ) {
+   if (session.questionsAsked >= 8) {
 
         // Generate final feedback
 

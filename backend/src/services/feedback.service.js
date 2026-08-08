@@ -1,58 +1,84 @@
-import "dotenv/config";
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY
-});
+import {
+    generateAIResponse
+} from "./ai.service.js";
 
 
 // ======================================================
-// HELPER: GEMINI JSON RESPONSE PARSER
+// PARSE AI JSON
 // ======================================================
 
-const parseGeminiJson = (text) => {
+const parseAIJson = (text) => {
 
     if (!text) {
-        throw new Error("Gemini returned empty response");
+        throw new Error("AI returned empty response");
     }
 
-    let cleaned = text.trim();
+    let cleaned = String(text).trim();
 
-    // Remove markdown code fences if Gemini returns them
+    // Remove markdown code fences
     cleaned = cleaned
         .replace(/^```json\s*/i, "")
         .replace(/^```\s*/i, "")
         .replace(/\s*```$/i, "")
         .trim();
 
-
     // Find JSON object
-
     const firstBrace = cleaned.indexOf("{");
     const lastBrace = cleaned.lastIndexOf("}");
-
 
     if (
         firstBrace === -1 ||
         lastBrace === -1 ||
         lastBrace <= firstBrace
     ) {
-        throw new Error("No valid JSON object found");
+        throw new Error("AI did not return valid JSON");
     }
-
 
     cleaned = cleaned.substring(
         firstBrace,
         lastBrace + 1
     );
 
+    // First normal JSON parse
+    try {
+        return JSON.parse(cleaned);
+    } catch (error) {
 
-    return JSON.parse(cleaned);
+        console.error(
+            "First JSON parse failed:",
+            error.message
+        );
+
+        console.error(
+            "Raw AI response:",
+            cleaned
+        );
+
+        // Try removing common problematic control characters
+        const repaired = cleaned
+            .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+            .trim();
+
+        try {
+            return JSON.parse(repaired);
+        } catch (secondError) {
+
+            console.error(
+                "Second JSON parse failed:",
+                secondError.message
+            );
+
+            throw new Error(
+                "AI returned malformed JSON"
+            );
+
+        }
+    }
 };
 
 
 // ======================================================
-// EVALUATE ONE CANDIDATE ANSWER
+// EVALUATE ANSWER
 // ======================================================
 
 const evaluateAnswer = async ({
@@ -61,116 +87,112 @@ const evaluateAnswer = async ({
     topic
 }) => {
 
-    const prompt = `
+    const systemPrompt = `
 You are a professional technical interviewer.
 
-Evaluate the candidate's answer to the question below.
+Evaluate the candidate answer fairly.
 
-QUESTION:
-${question}
+Return ONLY valid JSON.
 
-CANDIDATE ANSWER:
-${answer}
+Do not use markdown.
 
-TOPIC:
-${topic}
+The score MUST be between 0 and 10.
 
-Evaluate:
+Use this exact structure:
+
+{
+    "score": 7.5,
+    "feedback": "Good answer but some details are missing.",
+    "correctPoints": [
+        "Correct point"
+    ],
+    "missingPoints": [
+        "Missing point"
+    ],
+    "improvement": "Explain what the candidate should improve."
+}
+
+Scoring guidelines:
+
+0-2   = Very poor
+3-4   = Poor
+5-6   = Average
+7     = Good
+8     = Very good
+9     = Excellent
+10    = Outstanding
+
+Evaluate based on:
 
 1. Technical correctness
 2. Relevance
 3. Completeness
-4. Depth of understanding
+4. Depth
 5. Clarity
 6. Practical understanding
-7. Missing important concepts
+7. Reasoning
+8. Missing concepts
 
-Give a score from 0 to 10.
+Do not give marks for concepts that were not actually
+present in the candidate's answer.
 
-Score guidelines:
-
-9-10 = Excellent
-8-8.9 = Very good
-7-7.9 = Good
-6-6.9 = Acceptable but incomplete
-4-5.9 = Partially correct
-2-3.9 = Weak
-0-1.9 = Incorrect
-
-The feedback should sound like a real technical interviewer.
-
-Examples:
-
-"Excellent explanation."
-
-"Very good. You correctly explained..."
-
-"Good answer, but you missed..."
-
-"Partially correct. You should also consider..."
-
-"This answer needs improvement because..."
-
-Do not unnecessarily penalize the candidate.
-
-Do not give a high score when the answer
-contains major technical errors.
-
-Return ONLY a JSON object.
-
-Do not use markdown.
-Do not add any text before or after the JSON.
-
-Use exactly this structure:
-
-{
-    "score": 7.5,
-    "feedback": "Good answer, but some important details are missing.",
-    "correctPoints": [
-        "Correct point 1",
-        "Correct point 2"
-    ],
-    "missingPoints": [
-        "Missing concept 1"
-    ],
-    "improvement": "Explain the missing concepts in more detail."
-}
+Be fair and consistent.
 `;
 
 
-    const response =
-        await ai.models.generateContent({
+    const userPrompt = `
+QUESTION:
 
-            model: "gemini-3.6-flash",
+${question}
 
-            contents: prompt,
 
-            config: {
-                responseMimeType: "application/json"
-            }
+CANDIDATE ANSWER:
+
+${answer}
+
+
+TOPIC:
+
+${topic}
+
+
+Evaluate the candidate's answer.
+
+The feedback should sound like a real technical interviewer.
+
+Mention specifically:
+
+- What was correct
+- What was missing
+- What could be improved
+`;
+
+
+    const text =
+        await generateAIResponse({
+
+            systemPrompt,
+
+            userPrompt
 
         });
 
 
-    const text =
-        response.text?.trim();
-
-
     console.log(
-        "\n========== GEMINI EVALUATION RAW RESPONSE =========="
+        "\n========== AI EVALUATION =========="
     );
 
     console.log(text);
 
     console.log(
-        "=====================================================\n"
+        "===================================\n"
     );
 
 
     try {
 
         const result =
-            parseGeminiJson(text);
+            parseAIJson(text);
 
 
         let score =
@@ -178,67 +200,51 @@ Use exactly this structure:
 
 
         if (Number.isNaN(score)) {
+
             score = 0;
-        }
-
-
-        score = Math.max(
-            0,
-            Math.min(10, score)
-        );
-
-
-        const feedback =
-            typeof result.feedback === "string"
-                ? result.feedback
-                : "Answer evaluated successfully.";
-
-
-        let correctPoints =
-            result.correctPoints;
-
-
-        if (!Array.isArray(correctPoints)) {
-
-            correctPoints =
-                correctPoints
-                    ? [String(correctPoints)]
-                    : [];
 
         }
 
 
-        let missingPoints =
-            result.missingPoints;
+        // Keep score between 0 and 10
 
-
-        if (!Array.isArray(missingPoints)) {
-
-            missingPoints =
-                missingPoints
-                    ? [String(missingPoints)]
-                    : [];
-
-        }
-
-
-        const improvement =
-            typeof result.improvement === "string"
-                ? result.improvement
-                : "Try to provide a more detailed technical explanation.";
+        score =
+            Math.max(
+                0,
+                Math.min(
+                    10,
+                    score
+                )
+            );
 
 
         return {
 
             score,
 
-            feedback,
+            feedback:
+                typeof result.feedback === "string"
+                    ? result.feedback
+                    : "Answer evaluated successfully.",
 
-            correctPoints,
+            correctPoints:
+                Array.isArray(
+                    result.correctPoints
+                )
+                    ? result.correctPoints
+                    : [],
 
-            missingPoints,
+            missingPoints:
+                Array.isArray(
+                    result.missingPoints
+                )
+                    ? result.missingPoints
+                    : [],
 
-            improvement
+            improvement:
+                typeof result.improvement === "string"
+                    ? result.improvement
+                    : "Try to provide a more detailed explanation."
 
         };
 
@@ -249,13 +255,15 @@ Use exactly this structure:
             error.message
         );
 
+
         console.error(
-            "Gemini raw response:",
+            "AI response:",
             text
         );
 
+
         throw new Error(
-            "Gemini generated invalid answer evaluation"
+            "AI generated invalid answer evaluation"
         );
 
     }
@@ -264,209 +272,494 @@ Use exactly this structure:
 
 
 // ======================================================
-// GENERATE FINAL INTERVIEW FEEDBACK
+// CALCULATE INTERVIEW SCORE
+// ======================================================
+
+const calculateInterviewScore = (
+    session
+) => {
+
+    const evaluations = [];
+
+
+    for (
+        const item
+        of session.conversationHistory
+    ) {
+
+        if (
+            item.role !== "candidate"
+        ) {
+
+            continue;
+
+        }
+
+
+        if (
+            !item.evaluation
+        ) {
+
+            continue;
+
+        }
+
+
+        const score =
+            Number(
+                item.evaluation.score
+            );
+
+
+        if (
+            Number.isNaN(score)
+        ) {
+
+            continue;
+
+        }
+
+
+        evaluations.push({
+
+            score:
+                Math.max(
+                    0,
+                    Math.min(
+                        10,
+                        score
+                    )
+                ),
+
+            question:
+                item.question || null,
+
+            answer:
+                item.message || ""
+
+        });
+
+    }
+
+
+    // ------------------------------------------
+    // NO EVALUATIONS
+    // ------------------------------------------
+
+    if (
+        evaluations.length === 0
+    ) {
+
+        return {
+
+            totalMarks: 0,
+
+            maxMarks: 0,
+
+            percentage: 0,
+
+            averageScore: 0,
+
+            questionCount: 0,
+
+            questionWiseScores: []
+
+        };
+
+    }
+
+
+    // ------------------------------------------
+    // TOTAL SCORE
+    // ------------------------------------------
+
+    const totalMarks =
+        evaluations.reduce(
+            (
+                total,
+                item
+            ) =>
+                total + item.score,
+            0
+        );
+
+
+    const questionCount =
+        evaluations.length;
+
+
+    const maxMarks =
+        questionCount * 10;
+
+
+    const averageScore =
+        totalMarks /
+        questionCount;
+
+
+    const percentage =
+        (
+            totalMarks /
+            maxMarks
+        ) * 100;
+
+
+    return {
+
+        totalMarks:
+            Number(
+                totalMarks.toFixed(2)
+            ),
+
+        maxMarks,
+
+        percentage:
+            Number(
+                percentage.toFixed(2)
+            ),
+
+        averageScore:
+            Number(
+                averageScore.toFixed(2)
+            ),
+
+        questionCount,
+
+        questionWiseScores:
+            evaluations.map(
+                (
+                    item,
+                    index
+                ) => ({
+
+                    questionNumber:
+                        index + 1,
+
+                    score:
+                        item.score,
+
+                    maxScore: 10
+
+                })
+            )
+
+    };
+
+};
+
+
+// ======================================================
+// PERFORMANCE LEVEL
+// ======================================================
+
+const getPerformanceLevel = (
+    percentage
+) => {
+
+    if (
+        percentage >= 90
+    ) {
+
+        return "Outstanding";
+
+    }
+
+
+    if (
+        percentage >= 80
+    ) {
+
+        return "Excellent";
+
+    }
+
+
+    if (
+        percentage >= 70
+    ) {
+
+        return "Very Good";
+
+    }
+
+
+    if (
+        percentage >= 60
+    ) {
+
+        return "Good";
+
+    }
+
+
+    if (
+        percentage >= 50
+    ) {
+
+        return "Average";
+
+    }
+
+
+    if (
+        percentage >= 40
+    ) {
+
+        return "Needs Improvement";
+
+    }
+
+
+    return "Poor";
+
+};
+
+
+// ======================================================
+// FINAL INTERVIEW FEEDBACK
 // ======================================================
 
 const generateInterviewFeedback = async (
     session
 ) => {
 
-    const prompt = `
+    // ------------------------------------------
+    // CALCULATE MARKS LOCALLY
+    // ------------------------------------------
+
+    const scoreData =
+        calculateInterviewScore(
+            session
+        );
+
+
+    const performanceLevel =
+        getPerformanceLevel(
+            scoreData.percentage
+        );
+
+
+    // ------------------------------------------
+    // SYSTEM PROMPT
+    // ------------------------------------------
+
+    const systemPrompt = `
 You are an expert technical interviewer.
 
-Analyze the candidate's complete technical interview.
+Analyze the candidate's complete interview.
 
-CANDIDATE:
-${JSON.stringify(session.candidate, null, 2)}
+The numerical marks have already been calculated
+by the backend.
 
-INTERVIEW CONVERSATION:
-${JSON.stringify(session.conversationHistory, null, 2)}
+DO NOT calculate or change the numerical score.
 
-QUESTIONS ASKED:
-${session.questionsAsked}
-
-CURRICULUM DAYS COVERED:
-${JSON.stringify(session.daysCovered)}
-
-Provide a final technical interview assessment.
-
-Calculate an overall score from 0 to 100.
-
-Consider:
-
-1. Technical correctness
-2. Depth of understanding
-3. Explanation ability
-4. Reasoning
-5. Completeness
-6. Practical understanding
-7. Consistency across answers
-
-Identify:
-
-- Overall performance
-- Technical strengths
-- Weaknesses
-- Knowledge gaps
-- Specific improvements
-- Recommended next learning steps
-
-Return ONLY a JSON object.
-
-Do not use markdown.
-Do not add any text before or after the JSON.
+Return ONLY valid JSON.
 
 Use exactly this structure:
 
 {
-    "overallScore": 82,
-    "summary": "Overall assessment of the candidate.",
+    "summary": "Overall assessment.",
     "strengths": [
-        "Strength 1",
-        "Strength 2"
+        "Strength"
     ],
     "weaknesses": [
-        "Weakness 1",
-        "Weakness 2"
+        "Weakness"
     ],
     "gaps": [
-        "Knowledge gap 1",
-        "Knowledge gap 2"
+        "Knowledge gap"
     ],
     "next": [
-        "Recommendation 1",
-        "Recommendation 2"
+        "Recommended improvement"
     ]
 }
+
+Focus on:
+
+- Technical correctness
+- Depth
+- Explanation
+- Reasoning
+- Completeness
+- Practical understanding
+- Consistency
+- Repeated knowledge gaps
+- Areas needing improvement
+
+Be specific and evidence-based.
+
+Do not invent weaknesses that are not supported
+by the interview history.
 `;
 
 
-    const response =
-        await ai.models.generateContent({
+    // ------------------------------------------
+    // USER PROMPT
+    // ------------------------------------------
 
-            model: "gemini-3.6-flash",
+    const userPrompt = `
+CANDIDATE:
 
-            contents: prompt,
+${JSON.stringify(
+    session.candidate,
+    null,
+    2
+)}
 
-            config: {
-                responseMimeType:
-                    "application/json"
-            }
+
+INTERVIEW HISTORY:
+
+${JSON.stringify(
+    session.conversationHistory,
+    null,
+    2
+)}
+
+
+QUESTIONS ASKED:
+
+${session.questionsAsked}
+
+
+DAYS COVERED:
+
+${JSON.stringify(
+    session.daysCovered
+)}
+
+
+BACKEND CALCULATED SCORE:
+
+Total Marks:
+${scoreData.totalMarks}
+
+Maximum Marks:
+${scoreData.maxMarks}
+
+Percentage:
+${scoreData.percentage}%
+
+Average Score:
+${scoreData.averageScore}/10
+
+Performance Level:
+${performanceLevel}
+
+
+QUESTION-WISE SCORES:
+
+${JSON.stringify(
+    scoreData.questionWiseScores,
+    null,
+    2
+)}
+
+
+Analyze the complete interview and provide:
+
+1. Overall summary
+2. Strongest areas
+3. Weakest areas
+4. Knowledge gaps
+5. Specific recommendations for improvement
+
+Do not change or recalculate the backend score.
+`;
+
+
+    // ------------------------------------------
+    // AI FINAL ANALYSIS
+    // ------------------------------------------
+
+    const text =
+        await generateAIResponse({
+
+            systemPrompt,
+
+            userPrompt
 
         });
 
 
-    const text =
-        response.text?.trim();
-
-
     console.log(
-        "\n========== FINAL FEEDBACK RAW RESPONSE =========="
+        "\n========== FINAL FEEDBACK =========="
     );
 
     console.log(text);
 
     console.log(
-        "==================================================\n"
+        "====================================\n"
     );
 
 
     try {
 
         const result =
-            parseGeminiJson(text);
+            parseAIJson(text);
 
 
-        let overallScore =
-            Number(result.overallScore);
-
-
-        if (Number.isNaN(overallScore)) {
-            overallScore = 0;
-        }
-
-
-        overallScore = Math.max(
-            0,
-            Math.min(100, overallScore)
-        );
-
-
-        const summary =
-            typeof result.summary === "string"
-                ? result.summary
-                : "Interview completed successfully.";
-
-
-        let strengths =
-            result.strengths;
-
-
-        if (!Array.isArray(strengths)) {
-
-            strengths =
-                strengths
-                    ? [String(strengths)]
-                    : [];
-
-        }
-
-
-        let weaknesses =
-            result.weaknesses;
-
-
-        if (!Array.isArray(weaknesses)) {
-
-            weaknesses =
-                weaknesses
-                    ? [String(weaknesses)]
-                    : [];
-
-        }
-
-
-        let gaps =
-            result.gaps;
-
-
-        if (!Array.isArray(gaps)) {
-
-            gaps =
-                gaps
-                    ? [String(gaps)]
-                    : [];
-
-        }
-
-
-        let next =
-            result.next;
-
-
-        if (!Array.isArray(next)) {
-
-            next =
-                next
-                    ? [String(next)]
-                    : [];
-
-        }
-
+        // ------------------------------------------
+        // FINAL RESULT
+        // ------------------------------------------
 
         return {
 
-            overallScore,
+            // Numerical result from backend
 
-            summary,
+            totalMarks:
+                scoreData.totalMarks,
 
-            strengths,
+            maxMarks:
+                scoreData.maxMarks,
 
-            weaknesses,
+            percentage:
+                scoreData.percentage,
 
-            gaps,
+            averageScore:
+                scoreData.averageScore,
 
-            next
+            performanceLevel,
+
+            questionCount:
+                scoreData.questionCount,
+
+            questionWiseScores:
+                scoreData.questionWiseScores,
+
+
+            // AI-generated qualitative feedback
+
+            summary:
+                typeof result.summary === "string"
+                    ? result.summary
+                    : "Interview completed.",
+
+            strengths:
+                Array.isArray(
+                    result.strengths
+                )
+                    ? result.strengths
+                    : [],
+
+            weaknesses:
+                Array.isArray(
+                    result.weaknesses
+                )
+                    ? result.weaknesses
+                    : [],
+
+            gaps:
+                Array.isArray(
+                    result.gaps
+                )
+                    ? result.gaps
+                    : [],
+
+            next:
+                Array.isArray(
+                    result.next
+                )
+                    ? result.next
+                    : []
 
         };
 
@@ -477,13 +770,15 @@ Use exactly this structure:
             error.message
         );
 
+
         console.error(
-            "Gemini raw response:",
+            "AI response:",
             text
         );
 
+
         throw new Error(
-            "Gemini generated invalid final feedback"
+            "AI generated invalid final feedback"
         );
 
     }
@@ -491,7 +786,14 @@ Use exactly this structure:
 };
 
 
+// ======================================================
+// EXPORTS
+// ======================================================
+
 export {
+
     evaluateAnswer,
+
     generateInterviewFeedback
+
 };
