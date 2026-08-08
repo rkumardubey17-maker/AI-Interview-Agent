@@ -2,6 +2,7 @@ import curriculum from "../data/curriculum.json" with { type: "json" };
 import { generateInterviewQuestion } from "./gemini.service.js";
 
 
+// Candidate ka relevant data nikalna
 const getCandidateContext = (candidate) => {
 
     const completedMissions =
@@ -9,34 +10,45 @@ const getCandidateContext = (candidate) => {
             (mission) => mission.passed === true
         ) || [];
 
-    const notPassedMissions =
+    const skippedMissions =
         candidate.missions?.filter(
-            (mission) => mission.passed === false
+            (mission) => mission.skipped === true
         ) || [];
 
     return {
         member: candidate.member,
         completedMissions,
-        notPassedMissions,
+        skippedMissions,
         signals: candidate.signals || {}
     };
 };
 
 
+// Candidate ne jo days complete kiye hain,
+// unhi days ka curriculum nikalna
 const getRelevantCurriculum = (candidate) => {
 
     const completedDays =
         candidate.missions
-            ?.filter((mission) => mission.passed === true)
-            .map((mission) => mission.day) || [];
+            ?.filter(
+                (mission) => mission.passed === true
+            )
+            .map(
+                (mission) => mission.day
+            ) || [];
 
-    return curriculum.filter((day) =>
-        completedDays.includes(day.day)
+    return curriculum.days.filter(
+        (day) => completedDays.includes(day.day)
     );
 };
 
 
-const buildInterviewContext = (candidate, history = []) => {
+// Gemini ke liye complete context
+const buildInterviewContext = (
+    candidate,
+    history = [],
+    coveredDays = []
+) => {
 
     const candidateContext =
         getCandidateContext(candidate);
@@ -44,20 +56,26 @@ const buildInterviewContext = (candidate, history = []) => {
     const relevantCurriculum =
         getRelevantCurriculum(candidate);
 
+    // Jo days abhi tak cover nahi hue
+    const availableDays =
+        relevantCurriculum.filter(
+            (day) => !coveredDays.includes(day.day)
+        );
+
     return {
         candidate: candidateContext,
         curriculum: relevantCurriculum,
-        conversationHistory: history
+        conversationHistory: history,
+        coveredDays,
+        availableDays
     };
 };
 
 
+// Gemini se next question lena
 const getNextQuestion = async (context) => {
 
-    const question =
-        await generateInterviewQuestion(context);
-
-    return question;
+    return await generateInterviewQuestion(context);
 };
 
 

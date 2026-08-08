@@ -1,139 +1,449 @@
+import crypto from "crypto";
+
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { InterviewSession } from "../models/InterviewSession.model.js";
-import curriculum from "../data/curriculum.json" with { type: "json" };
-import { generateInterviewQuestion } from "./gemini.service.js";
+
+import {
+    buildInterviewContext,
+    getNextQuestion
+} from "../services/interview.service.js";
+
+import {
+    evaluateAnswer,
+    generateInterviewFeedback
+} from "../services/feedback.service.js";
+
 
 const interview = asyncHandler(async (req, res) => {
 
-    const { sessionId, candidate, message } = req.body;
+    const {
+        sessionId,
+        candidate,
+        message
+    } = req.body;
 
-    // Check sessionId
-    if (!sessionId) {
-        throw new ApiError(400, "sessionId is required");
+
+    // ==========================================
+    // 1. FIND EXISTING SESSION
+    // ==========================================
+
+    let session = null;
+
+    if (sessionId) {
+
+        session = await InterviewSession.findOne({
+            sessionId
+        });
+
     }
 
-    // Check whether this session already exists
-    let session = await InterviewSession.findOne({ sessionId });
 
-    // First request -> create new interview
+    // ==========================================
+    // 2. START NEW INTERVIEW
+    // ==========================================
+
     if (!session) {
 
         if (!candidate) {
-            throw new ApiError(400, "candidate is required");
+
+            throw new ApiError(
+                400,
+                "candidate is required"
+            );
+
         }
 
+
+        // Backend automatically generates session ID
+
+        const newSessionId =
+            crypto.randomUUID();
+
+
+        // Create MongoDB session
+
         session = await InterviewSession.create({
-            sessionId,
+
+            sessionId: newSessionId,
+
             candidate,
+
             conversationHistory: [],
+
             questionsAsked: 0,
+
             daysCovered: [],
+
             currentQuestion: "",
-            completed: false
+
+            completed: false,
+
+            feedback: null
+
         });
 
+
+        // Build initial context
+
+        const context =
+            buildInterviewContext(
+                candidate,
+                [],
+                []
+            );
+
+
+        // Generate first question
+
+        const result =
+            await getNextQuestion(context);
+
+
+        if (!result?.question || !result?.day) {
+
+            throw new ApiError(
+                500,
+                "AI generated an invalid question"
+            );
+
+        }
+
+
+        // Save first question
+
+        session.currentQuestion =
+            result.question;
+
+        session.questionsAsked = 1;
+
+        session.daysCovered = [
+            result.day
+        ];
+
+
+        session.conversationHistory.push({
+
+            role: "assistant",
+
+            message: result.question,
+
+            day: result.day,
+
+            topic: result.topic,
+
+            questionType: result.questionType
+
+        });
+
+
+        await session.save();
+
+
+        // Return first question
+
         return res.status(200).json(
+
             new ApiResponse(
+
                 200,
+
                 {
-                    reply: "Welcome. Let's begin your interview.",
+                    sessionId: session.sessionId,
+
+                    reply: result.question,
+
                     done: false
                 },
+
                 "Interview started successfully"
+
             )
+
         );
+
     }
 
-    // Subsequent request -> candidate sends answer
-    if (!message) {
-        throw new ApiError(400, "message is required");
+
+    // ==========================================
+    // 3. INTERVIEW ALREADY COMPLETED
+    // ==========================================
+
+    if (session.completed) {
+
+        return res.status(200).json(
+
+            new ApiResponse(
+
+                200,
+
+                {
+                    sessionId: session.sessionId,
+
+                    reply:
+                        "This interview has already been completed.",
+
+                    done: true,
+
+                    feedback: session.feedback
+                },
+
+                "Interview already completed"
+
+            )
+
+        );
+
     }
+
+
+    // ==========================================
+    // 4. CANDIDATE ANSWER REQUIRED
+    // ==========================================
+
+    if (!message) {
+
+        throw new ApiError(
+            400,
+            "message is required"
+        );
+
+    }
+
+
+    // ==========================================
+    // 5. FIND CURRENT QUESTION TOPIC
+    // ==========================================
+
+    const lastQuestion =
+        session.conversationHistory
+            .filter(
+                (item) =>
+                    item.role === "assistant"
+            )
+            .at(-1);
+
+
+    const currentTopic =
+        lastQuestion?.topic || "Technical";
+
+
+    // ==========================================
+    // 6. EVALUATE CANDIDATE ANSWER
+    // ==========================================
+
+    const answerEvaluation =
+        await evaluateAnswer({
+
+            question:
+                session.currentQuestion,
+
+            answer:
+                message,
+
+            topic:
+                currentTopic
+
+        });
+
+
+    // ==========================================
+    // 7. SAVE CANDIDATE ANSWER + EVALUATION
+    // ==========================================
 
     session.conversationHistory.push({
+
         role: "candidate",
-        message
+
+        message,
+
+        evaluation: answerEvaluation
+
     });
+
+
+    // ==========================================
+    // 8. CHECK IF INTERVIEW IS COMPLETE
+    // ==========================================
+
+    if (
+        session.questionsAsked >= 8 &&
+        session.daysCovered.length >= 4
+    ) {
+
+        // Generate final feedback
+
+        const finalFeedback =
+            await generateInterviewFeedback(
+                session
+            );
+
+
+        // Save final feedback
+
+        session.feedback =
+            finalFeedback;
+
+        session.completed = true;
+
+
+        await session.save();
+
+
+        // Return final result
+
+        return res.status(200).json(
+
+            new ApiResponse(
+
+                200,
+
+                {
+                    sessionId:
+                        session.sessionId,
+
+                    evaluation:
+                        answerEvaluation,
+
+                    done: true,
+
+                    feedback:
+                        finalFeedback
+                },
+
+                "Interview completed successfully"
+
+            )
+
+        );
+
+    }
+
+
+    // ==========================================
+    // 9. BUILD UPDATED CONTEXT
+    // ==========================================
+
+    const context =
+        buildInterviewContext(
+
+            session.candidate,
+
+            session.conversationHistory,
+
+            session.daysCovered
+
+        );
+
+
+    // ==========================================
+    // 10. GENERATE NEXT QUESTION
+    // ==========================================
+
+    const result =
+        await getNextQuestion(context);
+
+
+    if (!result?.question || !result?.day) {
+
+        throw new ApiError(
+
+            500,
+
+            "AI generated an invalid question"
+
+        );
+
+    }
+
+
+    // ==========================================
+    // 11. UPDATE QUESTION COUNT
+    // ==========================================
+
+    session.questionsAsked += 1;
+
+
+    session.currentQuestion =
+        result.question;
+
+
+    // ==========================================
+    // 12. UPDATE CURRICULUM DAYS
+    // ==========================================
+
+    if (
+        !session.daysCovered.includes(
+            result.day
+        )
+    ) {
+
+        session.daysCovered.push(
+            result.day
+        );
+
+    }
+
+
+    // ==========================================
+    // 13. SAVE NEXT AI QUESTION
+    // ==========================================
+
+    session.conversationHistory.push({
+
+        role: "assistant",
+
+        message:
+            result.question,
+
+        day:
+            result.day,
+
+        topic:
+            result.topic,
+
+        questionType:
+            result.questionType
+
+    });
+
 
     await session.save();
 
+
+    // ==========================================
+    // 14. RETURN EVALUATION + NEXT QUESTION
+    // ==========================================
+
     return res.status(200).json(
+
         new ApiResponse(
+
             200,
+
             {
-                reply: "Answer received. Processing your next question.",
+                sessionId:
+                    session.sessionId,
+
+                evaluation:
+                    answerEvaluation,
+
+                reply:
+                    result.question,
+
                 done: false
             },
-            "Interview updated successfully"
+
+            "Answer evaluated and next question generated"
+
         )
+
     );
+
 });
 
 
-
-const getCandidateContext = (candidate) => {
-
-    const completedMissions = candidate.missions?.filter(
-        (mission) => mission.passed === true
-    ) || [];
-
-    const skippedMissions = candidate.missions?.filter(
-        (mission) => mission.passed === false
-    ) || [];
-
-    return {
-        member: candidate.member,
-
-        completedMissions,
-
-        skippedMissions,
-
-        signals: candidate.signals || {}
-    };
-};
-
-
-const getRelevantCurriculum = (candidate) => {
-
-    const completedDays = candidate.missions
-        ?.filter((mission) => mission.passed === true)
-        .map((mission) => mission.day) || [];
-
-    return curriculum.filter((day) =>
-        completedDays.includes(day.day)
-    );
-};
-
-
-const buildInterviewContext = (candidate, history = []) => {
-
-    const candidateContext = getCandidateContext(candidate);
-
-    const relevantCurriculum = getRelevantCurriculum(candidate);
-
-    return {
-        candidate: candidateContext,
-
-        curriculum: relevantCurriculum,
-
-        conversationHistory: history
-    };
-};
-const getNextQuestion = async (context) => {
-
-    const question = await generateInterviewQuestion(context);
-
-    return question;
-};
-
-
-
 export {
-    interview,
-    getCandidateContext,
-    getRelevantCurriculum,
-    buildInterviewContext,
-     getNextQuestion
+    interview
 };
-
