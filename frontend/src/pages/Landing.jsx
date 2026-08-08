@@ -1,18 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-   Sun,
-   Moon,
-   ArrowRight,
-   Search,
-   Database,
-   Terminal,
-   Zap,
-   Server,
-   BarChart3,
-   Circle,
-   Bot
-} from 'lucide-react';
+import { Sun, Moon, ArrowRight, Search, Database, Terminal, Zap, Server, BarChart3, Circle, Bot } from 'lucide-react';
 import curriculumData from '../assets/curriculum.json';
 
 export default function Landing() {
@@ -67,8 +55,7 @@ export default function Landing() {
 
             {/* Hero Section - Glassmorphism Card with Border & Shadow Hover Effect */}
             <section className="mb-12 rounded-3xl border border-white/40 dark:border-slate-800/60 bg-white/60 dark:bg-slate-900/50 backdrop-blur-xl p-8 text-center shadow-xl shadow-slate-200/50 dark:shadow-none sm:p-12 transition-all duration-300 hover:border-blue-500/50 dark:hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/20">
-               <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 dark:bg-indigo-400/10 border border-indigo-500/20 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                  <Zap className="h-3.5 w-3.5" />
+               <span className="mb-4 inline-block rounded-full bg-indigo-500/10 dark:bg-indigo-400/10 border border-indigo-500/20 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                   Enterprise AI Engineering Cohort
                </span>
                <h1 className="mb-4 text-3xl font-black tracking-tight text-slate-900 dark:text-white sm:text-5xl">
@@ -122,7 +109,7 @@ export default function Landing() {
                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 
                   {/* Topic 1 */}
-                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-lg hover:shadow-blue-500/5">
+                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-md">
                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                         <Search className="h-5 w-5" />
                      </div>
@@ -133,7 +120,7 @@ export default function Landing() {
                   </div>
 
                   {/* Topic 2 */}
-                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-lg hover:shadow-blue-500/5">
+                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-md">
                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                         <Database className="h-5 w-5" />
                      </div>
@@ -144,7 +131,7 @@ export default function Landing() {
                   </div>
 
                   {/* Topic 3 */}
-                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-lg hover:shadow-blue-500/5">
+                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-md">
                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                         <Terminal className="h-5 w-5" />
                      </div>
@@ -155,7 +142,7 @@ export default function Landing() {
                   </div>
 
                   {/* Topic 4 */}
-                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-lg hover:shadow-blue-500/5">
+                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-md">
                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                         <Zap className="h-5 w-5" />
                      </div>
@@ -166,7 +153,7 @@ export default function Landing() {
                   </div>
 
                   {/* Topic 5 */}
-                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-lg hover:shadow-blue-500/5">
+                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-md">
                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
                         <Server className="h-5 w-5" />
                      </div>
@@ -177,7 +164,7 @@ export default function Landing() {
                   </div>
 
                   {/* Topic 6 */}
-                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-lg hover:shadow-blue-500/5">
+                  <div className="rounded-2xl border border-white/50 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-slate-800/50 hover:shadow-md">
                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
                         <BarChart3 className="h-5 w-5" />
                      </div>
