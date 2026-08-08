@@ -176,7 +176,7 @@ export default function InterviewPage() {
         </header>
 
         {/* Candidate & Interview Context Bar */}
-        <section className="mb-6 rounded-2xl border border-white/40 dark:border-slate-800/60 bg-white/60 dark:bg-slate-900/50 backdrop-blur-xl p-4 sm:p-5 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-wrap items-center justify-between gap-4 shrink-0">
+        <section className="mb-6 rounded-2xl border border-gray-200/50 dark:border-slate-800/60 bg-white/60 dark:bg-slate-900/50 backdrop-blur-xl p-4 sm:p-5 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-wrap items-center justify-between gap-4 shrink-0">
           <div className="flex items-center space-x-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/30 font-bold text-base shrink-0">
               {candidate?.name ? candidate.name.split(' ').map((n) => n[0]).join('') : <User className="h-5 w-5" />}
