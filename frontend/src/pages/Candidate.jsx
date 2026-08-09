@@ -19,15 +19,21 @@ export default function CandidateSelection() {
       role: item.member.jobRole,
       experience: `${item.member.yearsExperience} yrs exp`,
       education: item.member.education,
+
       avatarColor: index % 3 === 0
          ? 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/30'
          : index % 3 === 1
             ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30'
             : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+
       commitDays: item.signals.commitDays,
       missionsCompleted: item.signals.missionsCompleted,
       missionsFirstTry: item.signals.missionsFirstTry,
-      rawMissions: item.missions
+
+      // Backend-required fields
+      member: item.member,
+      missions: item.missions,
+      signals: item.signals
    }));
 
    const filteredCandidates = candidates.filter(
@@ -38,6 +44,9 @@ export default function CandidateSelection() {
    );
 
    const handleSelectCandidate = (candidate) => {
+      console.log("SELECTED CANDIDATE:", candidate);
+      console.log("SELECTED MISSIONS:", candidate.missions);
+
       navigate(`/interview/${candidate.id}`, {
          state: { candidate },
       });
@@ -58,7 +67,7 @@ export default function CandidateSelection() {
             {/* Navigation & Theme Toggle */}
             <header className="mb-8 flex justify-between items-center">
                <div
-                   onClick={() => handleSelectCandidate(candidate)}
+                  onClick={() => navigate('/')}
                   className="flex items-center space-x-2.5 cursor-pointer group"
                >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10 border border-blue-500/30 dark:bg-cyan-500/10 dark:border-cyan-500/30 transition-transform group-hover:scale-105">

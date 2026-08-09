@@ -33,7 +33,11 @@ const generateAIResponse = async ({
                 }
             ],
 
-            temperature: 0.3
+            temperature: 0.3,
+
+            response_format: {
+                type: "json_object"
+            }
         });
 
     const content =

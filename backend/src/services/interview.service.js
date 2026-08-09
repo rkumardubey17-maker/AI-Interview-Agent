@@ -361,15 +361,7 @@ interview question.
     // AI CALL
     // ------------------------------------------
 
-    const text =
-        await generateAIResponse({
-
-            systemPrompt,
-
-            userPrompt
-
-        });
-
+    const text = await generateAIResponse({ systemPrompt, userPrompt });
 
     // ------------------------------------------
     // DEBUG LOG
