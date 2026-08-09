@@ -11,7 +11,7 @@ The platform uses **React.js, Node.js, Express.js, MongoDB, and OpenRouter** to 
 ### Frontend
 
 **Vercel:**
-`https://your-frontend-url.vercel.app`
+https://ai-interview-agent-wheat.vercel.app/
 
 ### Backend
 
